@@ -1,0 +1,4 @@
+---
+# tasks file for ansible-save-secrets
+
+- include: "{{ ass_secret_store }}.yml"

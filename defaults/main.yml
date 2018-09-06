@@ -1,0 +1,12 @@
+---
+# defaults file for ansible-save-secrets
+ass_vault_mount: "{{ vault_mount | d('') }}"
+ass_vault_path: "{{ vault_path | d('') }}"
+ass_secret_store: "{{ secret_store | d('vault') }}"
+
+ass_fs_path: "/tmp/secrets"
+
+disable_ansible_log: true
+
+ass_fs_dir_mode: "0700"
+ass_fs_file_mode: "0600"

@@ -1,0 +1,60 @@
+---
+######################################################################################
+# This part is a copy/paste from ansible-load secrets and cannot be done other way. #
+######################################################################################
+
+- name: Test Vault connection
+  hashivault_status:
+  register: hv_status
+  ignore_errors: true
+  delegate_to: localhost
+  run_once: true
+
+- name: Fail if test connection is unsuccessful
+  fail:
+    msg: "Connection to Hashicorp Vault failed because of  {{ hv_status.msg }}"
+  run_once: true
+  delegate_to: localhost
+  when:
+    - hv_status.failed is defined
+    - hv_status.failed
+
+- name: Save to Vault
+  hashivault_write:
+    secret: "{{
+               '/' + (
+                       (
+                         ass_vault_mount +
+                         '/' +
+                         ass_vault_path +
+                         '/' +
+                         (
+                           'hostsecrets/' if item.host is defined
+                                                       else (item.group | d(''))
+                         ) + '/' +
+                         item.host | default('')
+                       ) if (item.path is not defined)
+                         else (item.path)
+                ) +
+               '/' +
+                item.var_name | default(item.var)
+             }}"
+    token: "{{ item.token | default(omit) }}"
+    data:
+      "{ '{{ item.key }}':
+           '{{
+              hostvars[
+                       item.host if (item.host|default(false))
+                       else (groups[item.group].0 if item.group | d(false)
+                                                  else play_hosts.0)
+                      ]
+                      [
+                        item.var_name | default(item.var)
+                      ]
+            }}'
+       }"
+  with_items:
+    - "{{ vars_stored }}"
+  no_log: "{{ disable_ansible_log }}"
+  ignore_errors: item.ignore_undefined | default(false)
+  delegate_to: localhost

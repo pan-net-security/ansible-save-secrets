@@ -1,0 +1,62 @@
+---
+######################################################################################
+# This part is a copy/paste from ansible-load secrets and cannot be done other way. #
+######################################################################################
+
+- name: Prepare directories
+  file:
+    path: "{{
+             (
+               ass_fs_path +
+               '/' +
+               (
+                 'hostsecrets/' if item.host is defined
+                                else (item.group | d(''))
+               ) +
+               '/' +
+               item.host | default('')
+             ) if (item.path is not defined)
+               else (item.path)
+             }}"
+    mode: "{{ ass_fs_dir_mode }}"
+    state: directory
+  with_items:
+    - "{{ vars_stored }}"
+  no_log: "{{ disable_ansible_log }}"
+  delegate_to: localhost
+
+- name: Save to filesystem
+  copy:
+    dest: "{{
+             (
+               (
+                 ass_fs_path +
+                 '/' +
+                 (
+                   'hostsecrets/' if item.host is defined
+                                  else (item.group | d(''))
+                 ) +
+                 '/' +
+                 item.host | default('')
+               ) if (item.path is not defined)
+                 else (item.path)
+             ) +
+             '/' +
+             (item.var_name | default(item.var))+'.'+item.key
+             }}"
+    content:
+      "{{
+         hostvars[
+                  item.host if (item.host|default(false))
+                  else (groups[item.group].0 if item.group | d(false)
+                                             else play_hosts.0)
+                 ]
+                 [
+                  item.var_name | default(item.var)
+                 ]
+       }}"
+    mode: "{{ ass_fs_file_mode }}"
+  with_items:
+    - "{{ vars_stored }}"
+  no_log: "{{ disable_ansible_log }}"
+  delegate_to: localhost

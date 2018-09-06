@@ -1,0 +1,212 @@
+---
+
+# Test 1
+
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: "Set 'test' to 'testABCDE'"
+      set_fact:
+        test: "testABCDE"
+
+- hosts: all
+  gather_facts: false
+  vars:
+    - vars_stored:
+        - var: "test"
+          key: "test"
+  roles:
+    - role: "{{ playbook_dir }}/.."
+      become: false
+
+- hosts: localhost
+  gather_facts: false
+  vars:
+    - result: "{{ lookup('file',
+                         ass_fs_path+'/test.test')
+               }}"
+  tasks:
+    - name: "Test1: test should be 'testABCDE'."
+      fail:
+        msg: "test does not equal testABCDE, but {{ result }}"
+      when: "result != 'testABCDE'"
+
+# Test 2
+
+- hosts: subgroup1
+  gather_facts: false
+  tasks:
+    - name: "'Set 'lorem' to 'ipsum'"
+      set_fact:
+        lorem: "ipsum"
+
+- hosts: all
+  gather_facts: false
+  vars:
+    - vars_stored:
+        - var: "lorem"
+          key: "dolor"
+          group: "subgroup1"
+  roles:
+    - role: "{{ playbook_dir }}/.."
+      become: false
+
+- hosts: localhost
+  gather_facts: false
+  vars:
+    - result: "{{ lookup('file',
+                         ass_fs_path+'/subgroup1/lorem.dolor')
+               }}"
+  tasks:
+    - name: |
+        Test2: Save group value, var name is lorem value should be ipsum
+        only for subgroup1
+      fail:
+        msg: "lorem is not 'ipsum', lorem is {{ result }}"
+      when: "result != 'ipsum'"
+
+# Test 3
+
+- hosts: test3
+  gather_facts: false
+  tasks:
+    - name: "Set 'testvar' to 'net'"
+      set_fact:
+        testvar: "net"
+
+- hosts: all
+  gather_facts: false
+  vars:
+    - vars_stored:
+        - var: "testvar"
+          key: "teststring"
+          host: "test3"
+  roles:
+    - role: "{{ playbook_dir }}/.."
+      become: false
+
+- hosts: localhost
+  gather_facts: false
+  vars:
+    - result: "{{ lookup('file',
+                         ass_fs_path+'/hostsecrets/test3/testvar.teststring')
+               }}"
+  tasks:
+    - name: "Test3: testvar should be 'net' only on host test3"
+      fail:
+        msg: "testvar is not 'net', testvar is {{ result }}"
+      when: "(result != 'net')"
+
+# Test 4
+
+- hosts: subgroup1
+  gather_facts: false
+  tasks:
+    - name: "Set 'something' to 'bad'"
+      set_fact:
+        something: "bad"
+
+- hosts: subgroup2
+  gather_facts: false
+  tasks:
+    - name: "Set 'something' to 'good'"
+      set_fact:
+        something: "good"
+
+- hosts: subgroup1, subgroup2
+  gather_facts: false
+  vars:
+    - vars_stored:
+        - var: "something"
+          key: "anykey"
+          group: "subgroup1"
+        - var: "something"
+          key: "anykey"
+          group: "subgroup2"
+  roles:
+    - role: "{{ playbook_dir }}/.."
+      become: false
+
+- hosts: localhost
+  gather_facts: false
+  vars:
+    - result1: "{{ lookup('file',
+                          ass_fs_path+'/subgroup1/something.anykey')
+                }}"
+    - result2: "{{ lookup('file',
+                          ass_fs_path+'/subgroup2/something.anykey')
+                }}"
+  tasks:
+    - name: "Test4"
+      fail:
+        msg: |
+          result1 should be 'bad' (is '{{ result1 }}')
+          result2 should be 'good' (is '{{ result2 }}')
+      when: "result1 != 'bad' and result2 !='good'"
+
+# Test 5
+
+- hosts: subgroup1:subgroup2
+  gather_facts: false
+  vars:
+    - vars_stored:
+        - var: "something"
+          key: "anykey"
+          group: "{{ group_name }}"
+  roles:
+    - role: "{{ playbook_dir }}/.."
+      become: false
+  tasks:
+    - debug:
+        var: item.group
+      with_items: "{{ vars_stored }}"
+
+- hosts: localhost
+  gather_facts: false
+  vars:
+    - result1: "{{ lookup('file',
+                          ass_fs_path+'/subgroup1/something.anykey')
+                }}"
+    - result2: "{{ lookup('file',
+                          ass_fs_path+'/subgroup2/something.anykey')
+                }}"
+  tasks:
+    - name: "Test5"
+      fail:
+        msg: |
+          result1 should be 'bad' (is '{{ result1 }}'),
+          result2 should be 'good' (is '{{ result2 }}')
+      when:
+        - result1 != 'bad'
+        - result2 != 'good'
+
+# Test 6
+
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: "Set 'lalaland' to 'aligator'"
+      set_fact:
+        lalaland: "aligator"
+
+- hosts: all
+  gather_facts: false
+  vars:
+    - vars_stored:
+        - var: "lalaland"
+          key: "test"
+  roles:
+    - role: "{{ playbook_dir }}/.."
+      become: false
+
+- hosts: localhost
+  gather_facts: false
+  vars:
+    - result: "{{ lookup('file',
+                         ass_fs_path+'/lalaland.test')
+               }}"
+  tasks:
+    - name: "Test6: lalaland should be 'aligator'."
+      fail:
+        msg: "lalaland does not equal aligator, but {{ result }}"
+      when: "result != 'aligator'"

@@ -1,0 +1,106 @@
+---
+image: <redacted>
+
+stages:
+  - test
+
+after_script:
+  - |
+    for i in {1..4}; do
+    docker stop alstest${i}
+    docker rm alstest${i}
+    done
+  - docker stop alsvault-dev
+  - docker rm alsvault-dev
+
+run_tests_vault:
+  stage: test
+  script:
+    - |
+      for i in {1..4}; do
+      docker rm alstest${i} || true
+      done
+    - docker rm alsvault-dev || true
+    - ssh-keygen -f tempkey -P ""
+    - PK=`base64 -w0 tempkey.pub`
+    - |
+      for i in {1..4}; do
+        docker run --name alstest${i} \
+                   --env UBUNTU_SSH_PUBKEY=$PK \
+                   --detach \
+                   <redacted>:4567/docker-images/docker-ubuntu-1604-dummy:16.04
+      done
+    - |
+      docker run --name alsvault-dev \
+                 --detach \
+                 --env VAULT_DEV_ROOT_TOKEN_ID="blebleble" \
+                 vault:0.9.5
+    - |
+      for i in {1..4}; do
+      export IP${i}=`docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' alstest${i}`
+      done
+    - VAULT_IP=`docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' alsvault-dev`
+    - |
+      cat > hosts << EOF
+      test1 ansible_ssh_host=$IP1
+      test2 ansible_ssh_host=$IP2
+      test3 ansible_ssh_host=$IP3
+      test4 ansible_ssh_host=$IP4
+      [all]
+      test1
+      test2
+      test3
+      test4
+      [subgroup1]
+      test2
+      test4
+      [subgroup2]
+      test1
+      test3
+      EOF
+    - cat hosts
+
+    - eval `ssh-agent`
+    - ssh-add tempkey
+    - echo "$VAULT_IP vault.sandbox.com vault" >> /etc/hosts
+    - export VAULT_ADDR=http://vault.sandbox.com:8200/
+    - export VAULT_TOKEN="blebleble"
+    - unset http_proxy
+    - unset https_proxy
+    - |
+      ansible-playbook --user ubuntu \
+                       --inventory hosts \
+                       --extra-vars ass_secret_store="vault" \
+                       --extra-vars ass_vault_mount="secret" \
+                       --extra-vars ass_vault_path="test" \
+                       --extra-vars disable_ansible_log=false \
+                       tests/test-vault.yml
+
+run_tests_fs:
+  stage: test
+  script:
+    - |
+      cat > hosts << EOF
+      test1 ansible_ssh_host=1.2.3.4
+      test2 ansible_ssh_host=2.3.4.5
+      test3 ansible_ssh_host=3.4.5.6
+      test4 ansible_ssh_host=4.5.6.7
+      [all]
+      test1
+      test2
+      test3
+      test4
+      [subgroup1]
+      test2
+      test4
+      [subgroup2]
+      test1
+      test3
+      EOF
+    - |
+      ansible-playbook --user ubuntu \
+                       --inventory hosts \
+                       --extra-vars ass_secret_store="fs" \
+                       --extra-vars ass_fs_path="/tmp" \
+                       --extra-vars disable_ansible_log=false \
+                       tests/test-fs.yml
