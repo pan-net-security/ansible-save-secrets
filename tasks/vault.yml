@@ -3,22 +3,6 @@
 # This part is a copy/paste from ansible-load secrets and cannot be done other way. #
 ######################################################################################
 
-- name: Test Vault connection
-  hashivault_status:
-  register: hv_status
-  ignore_errors: true
-  delegate_to: localhost
-  run_once: true
-
-- name: Fail if test connection is unsuccessful
-  fail:
-    msg: "Connection to Hashicorp Vault failed because of  {{ hv_status.msg }}"
-  run_once: true
-  delegate_to: localhost
-  when:
-    - hv_status.failed is defined
-    - hv_status.failed
-
 - name: Save to Vault
   hashivault_write:
     secret: "{{
@@ -49,7 +33,7 @@
                                                   else play_hosts.0)
                       ]
                       [
-                        item.var_name | default(item.var)
+                        item.var
                       ]
             }}'
        }"
