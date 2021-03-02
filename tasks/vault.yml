@@ -42,3 +42,4 @@
   no_log: "{{ disable_ansible_log }}"
   ignore_errors: item.ignore_undefined | default(false)
   delegate_to: localhost
+  changed_when: false
